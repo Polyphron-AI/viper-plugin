@@ -1,0 +1,15 @@
+{
+  "id": "drivefiles",
+  "version": "1.0.0",
+  "title": "Drive files",
+  "viper": ">=0.6.14 <0.7.0",
+  "binaries": {
+    "linux/amd64": { "path": "bin/drive-files-linux-amd64" },
+    "linux/arm64": { "path": "bin/drive-files-linux-arm64" },
+    "darwin/arm64": { "path": "bin/drive-files-darwin-arm64" },
+    "windows/amd64": { "path": "bin/drive-files.exe" }
+  },
+  "connections": [
+    { "provider": "google", "scopes": ["https://www.googleapis.com/auth/drive.readonly"] }
+  ]
+}

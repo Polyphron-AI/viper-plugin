@@ -1,0 +1,9 @@
+{
+  "name": "chat-alerts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@polyphron/viper-plugin": "^0.6.14"
+  }
+}

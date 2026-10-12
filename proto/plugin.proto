@@ -1,0 +1,438 @@
+// The contract between Viper and a plugin (D-023). A plugin is its own
+// program: it serves Plugin, and calls Host back. Fields are only ever added,
+// never renamed or removed, because plugins are built outside a Viper release.
+//
+// Start: Viper runs the plugin with VIPER_PLUGIN_TOKEN and VIPER_PLUGIN_HOST
+// set. The plugin serves gRPC on a loopback port and prints one line,
+// "VIPER-PLUGIN 1 <host:port>", to stdout. Every call either way carries
+// "authorization: Bearer <token>".
+//
+// Record values, settings, configs and payloads travel as JSON bytes, so any
+// language can read them without well-known types.
+syntax = "proto3";
+
+package viper.plugin.v1;
+
+option go_package = "github.com/Polyphron-AI/viper-plugin/proto;pluginpb";
+
+// Plugin is served by the plugin; Viper calls it.
+service Plugin {
+  // Describe says what the plugin adds. Viper calls it once per start.
+  rpc Describe(DescribeRequest) returns (Description);
+  // RunBlock runs one workflow step of a block the plugin declared.
+  rpc RunBlock(BlockRequest) returns (BlockReply);
+  // CallTool runs one MCP tool the plugin declared.
+  rpc CallTool(ToolRequest) returns (ToolReply);
+  // HandleRoute answers one HTTP request to a route the plugin declared.
+  rpc HandleRoute(RouteRequest) returns (RouteReply);
+  // HandleEvent receives one record event the plugin asked for.
+  rpc HandleEvent(EventRequest) returns (Done);
+  // RunJob runs one job the plugin queued with Host.EnqueueJob.
+  rpc RunJob(JobRequest) returns (Done);
+}
+
+// Host is served by Viper; the plugin calls it. Every request names the call
+// it belongs to, and acts in that call's project as that call's caller, so
+// the project's rules apply. A finished call can't be used again.
+service Host {
+  rpc ListRecords(ListRecordsRequest) returns (ListRecordsReply);
+  rpc GetRecord(RecordRequest) returns (RecordReply);
+  rpc CreateRecord(WriteRecordRequest) returns (RecordReply);
+  rpc UpdateRecord(WriteRecordRequest) returns (RecordReply);
+  rpc DeleteRecord(RecordRequest) returns (Done);
+  // EnqueueJob queues a job kind the plugin declared; Viper calls RunJob later.
+  rpc EnqueueJob(EnqueueJobRequest) returns (Done);
+  // ReadSecret reads a project secret the plugin declared.
+  rpc ReadSecret(ReadSecretRequest) returns (ReadSecretReply);
+  // SendMail queues an email through the project's mail settings.
+  rpc SendMail(SendMailRequest) returns (Done);
+  // SaveFile stores a file on a record's file field, through the update rule.
+  rpc SaveFile(SaveFileRequest) returns (Done);
+  // ReadFile reads a file a record holds, through the view rule.
+  rpc ReadFile(FileRequest) returns (FileReply);
+  // Log writes a line to Viper's log, with secrets masked.
+  rpc Log(LogRequest) returns (Done);
+  // AI calls a model through the providers the AI step uses.
+  rpc AI(AIRequest) returns (AIReply);
+  // CreateUpload opens an upload session on a record's file field, the same
+  // session as the app route that starts a big upload, owned by the plugin
+  // in this project. It needs the update rule (an elevated call: the "file"
+  // grant too); a visitor's call that isn't elevated is refused. The plugin
+  // hands the URL to a visitor; Viper checks the size, type and expiry.
+  rpc CreateUpload(CreateUploadRequest) returns (CreateUploadReply);
+  // CompleteUpload finishes a session the plugin started in this project
+  // and attaches the file to its record, after checking its size, sha256
+  // and sniffed type.
+  rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadReply);
+  // GetAccessToken gives a user's token at a connected account (Google,
+  // Microsoft), fresh for at least a minute. The manifest must name the
+  // provider and scopes and the project must have accepted them. A user's
+  // own call may ask for that user; a job or event only for a user its
+  // payload names, and only with background. NotFound: the user hasn't
+  // connected; FailedPrecondition: they must connect again.
+  rpc GetAccessToken(AccessTokenRequest) returns (AccessTokenReply);
+}
+
+message Done {}
+
+message DescribeRequest {}
+
+// Call is what Viper knows about one call into the plugin.
+message Call {
+  // id is passed back on every Host request made for this call.
+  string id = 1;
+  string project = 2;
+  // settings is the project's saved settings for this plugin, a JSON object.
+  // Secret settings arrive unsealed.
+  bytes settings = 3;
+  // caller is "user/<id>", "key/<id>", "system" (events, jobs, workflows run
+  // as the service) or "" (a visitor).
+  string caller = 4;
+  // elevated is true when this call runs as the service on an elevated
+  // route (see Route.elevated). caller still names who called, "" for a
+  // visitor.
+  bool elevated = 5;
+  // delivery names one queued event or job, "" on other calls. A retry
+  // sends the same delivery again, so handlers must be idempotent: one that
+  // already did the work for a delivery should skip it.
+  string delivery = 6;
+}
+
+// Description is everything a plugin adds. id and version must match the
+// signed manifest.
+message Description {
+  string id = 1;
+  string version = 2;
+  string title = 3;
+  string blurb = 4;
+  // settings is the per-project settings form.
+  repeated Field settings = 5;
+  // secrets are the project vault names the plugin may read.
+  repeated string secrets = 6;
+  repeated Block blocks = 7;
+  repeated Tool tools = 8;
+  repeated Route routes = 9;
+  repeated EventSub events = 10;
+  // collections is a JSON array of collection definitions, the same shape the
+  // admin API saves. Viper creates or changes them when a project turns the
+  // plugin on or gets a new version, and marks them options.plugin = id.
+  bytes collections = 11;
+  // jobs are the job kinds the plugin may queue.
+  repeated string jobs = 12;
+}
+
+// Field is one input on a settings form or a block.
+message Field {
+  string key = 1;
+  string label = 2;
+  // kind is text, textarea, number, bool, select or secret for settings; a
+  // block field may also use code, json and collection.
+  string kind = 3;
+  repeated Option options = 4;
+  string placeholder = 5;
+  string description = 6;
+  bool required = 7;
+  // default_json is the value a new project starts with, as JSON.
+  string default_json = 8;
+}
+
+message Option {
+  string id = 1;
+  string label = 2;
+}
+
+// Block is a workflow step. Its type in a workflow is "<plugin id>.<name>".
+message Block {
+  string name = 1;
+  string label = 2;
+  string blurb = 3;
+  repeated Field fields = 4;
+  repeated Output outputs = 5;
+  // handles are extra ways out besides the default one.
+  repeated string handles = 6;
+}
+
+message Output {
+  string key = 1;
+  string description = 2;
+}
+
+// Tool is a project MCP tool, named "<plugin id>_<name>".
+message Tool {
+  string name = 1;
+  string description = 2;
+  // input_schema is a JSON Schema object.
+  bytes input_schema = 3;
+  bool read_only = 4;
+}
+
+// Route is an HTTP route. App routes live under
+// /api/p/<project>/plugins/<id>/<path> and take the project's normal access
+// (users, keys, visitors). Admin routes live under
+// /api/admin/projects/<project>/plugins/<id>/x/<path> and need settings read
+// (GET) or write (anything else).
+message Route {
+  string method = 1;
+  // path is relative, like "hello" or "items/:id".
+  string path = 2;
+  string summary = 3;
+  bool admin = 4;
+  // elevated asks for the service identity on an app route: Host requests
+  // then skip the project's rules, but only on the collections and actions
+  // the signed manifest's "elevated" entry for "<method> <path>" grants,
+  // and anything else is refused. Viper refuses to start a plugin whose
+  // elevated routes and manifest entries don't match. The rules no longer
+  // guard the route, so the plugin must check the visitor's request itself
+  // (key, origin, size) before it writes.
+  bool elevated = 5;
+}
+
+// EventSub asks for record events on one collection.
+message EventSub {
+  string collection = 1;
+  // actions are create, update and delete; empty means all three.
+  repeated string actions = 2;
+}
+
+message BlockRequest {
+  Call call = 1;
+  string block = 2;
+  // config is the step's fields with their blanks filled, a JSON object.
+  bytes config = 3;
+}
+
+message BlockReply {
+  // output is the step's output, JSON; later steps read it as {{ step.key }}.
+  bytes output = 1;
+  // way is the handle to leave by, "" for the default.
+  string way = 2;
+}
+
+message ToolRequest {
+  Call call = 1;
+  string tool = 2;
+  bytes arguments = 3;
+}
+
+message ToolReply {
+  // result is JSON shown to the agent.
+  bytes result = 1;
+  bool is_error = 2;
+}
+
+message RouteRequest {
+  Call call = 1;
+  string method = 2;
+  // path is the part after the plugin's prefix, like "items/abc".
+  string path = 3;
+  string query = 4;
+  map<string, string> headers = 5;
+  bytes body = 6;
+  // params are the route's :named parts.
+  map<string, string> params = 7;
+  // route is the declared path that matched, like "items/:id".
+  string route = 8;
+  // client_ip is the caller's address as Viper sees it: the socket peer, or
+  // the address behind a trusted proxy (VIPER_TRUSTED_PROXIES). It is never
+  // read from a header the client chose; X-Forwarded-For in headers is
+  // untrusted. Empty if it can't be told. An address can be personal data,
+  // so store a hash or a shortened form unless there is a reason not to.
+  string client_ip = 9;
+  // client_ip_trusted is false when Viper saw a forwarded header but has no
+  // trusted proxy set, which usually means client_ip is the proxy's.
+  bool client_ip_trusted = 10;
+}
+
+message RouteReply {
+  int32 status = 1;
+  map<string, string> headers = 2;
+  bytes body = 3;
+}
+
+message EventRequest {
+  Call call = 1;
+  string collection = 2;
+  // action is create, update or delete.
+  string action = 3;
+  bytes record = 4;
+  bytes old = 5;
+}
+
+message JobRequest {
+  Call call = 1;
+  string kind = 2;
+  bytes payload = 3;
+}
+
+message ListRecordsRequest {
+  string call = 1;
+  string collection = 2;
+  string filter = 3;
+  string sort = 4;
+  int32 page = 5;
+  int32 per_page = 6;
+  string expand = 7;
+}
+
+message ListRecordsReply {
+  // items is a JSON array of records.
+  bytes items = 1;
+  int64 total = 2;
+}
+
+message RecordRequest {
+  string call = 1;
+  string collection = 2;
+  string id = 3;
+}
+
+message WriteRecordRequest {
+  string call = 1;
+  string collection = 2;
+  // id is empty on create.
+  string id = 3;
+  bytes body = 4;
+}
+
+message RecordReply {
+  bytes record = 1;
+}
+
+message EnqueueJobRequest {
+  string call = 1;
+  string kind = 2;
+  bytes payload = 3;
+  // delay_seconds puts the job off; 0 runs it soon.
+  int64 delay_seconds = 4;
+}
+
+message AccessTokenRequest {
+  string call = 1;
+  string user = 2;
+  string provider = 3;
+  repeated string scopes = 4;
+}
+
+message AccessTokenReply {
+  string token = 1;
+  int64 expires_unix = 2;
+}
+
+message ReadSecretRequest {
+  string call = 1;
+  string name = 2;
+}
+
+message ReadSecretReply {
+  string value = 1;
+}
+
+message SendMailRequest {
+  string call = 1;
+  repeated string to = 2;
+  string subject = 3;
+  string text = 4;
+  string html = 5;
+  // template is a project email template name; data fills it, as JSON.
+  string template = 6;
+  bytes data = 7;
+}
+
+message SaveFileRequest {
+  string call = 1;
+  string collection = 2;
+  string record = 3;
+  string field = 4;
+  string name = 5;
+  bytes content = 6;
+}
+
+message FileRequest {
+  string call = 1;
+  string collection = 2;
+  string record = 3;
+  string name = 4;
+}
+
+message FileReply {
+  bytes content = 1;
+  string type = 2;
+}
+
+message LogRequest {
+  string call = 1;
+  // level is debug, info, warn or error.
+  string level = 2;
+  string message = 3;
+}
+
+message AIRequest {
+  string call = 1;
+  // provider is anthropic, openai or gemini.
+  string provider = 2;
+  string model = 3;
+  // key_secret is the project vault name holding the provider key.
+  string key_secret = 4;
+  string system = 5;
+  // messages is a JSON array of {role, content}.
+  bytes messages = 6;
+  int32 max_tokens = 7;
+  // schema, when set, is a JSON Schema the answer must match.
+  bytes schema = 8;
+}
+
+message AIReply {
+  string text = 1;
+  // json is the parsed answer when a schema was given.
+  bytes json = 2;
+}
+
+message CreateUploadRequest {
+  string call = 1;
+  string collection = 2;
+  string record = 3;
+  string field = 4;
+  string name = 5;
+  // size is the file's size in bytes; the field's limit is the ceiling.
+  int64 size = 6;
+  // sha256 is optional, 64 lowercase hex.
+  string sha256 = 7;
+  // direct asks for a presigned PUT to the bucket, if the project stores
+  // files in S3. Otherwise the session is in parts.
+  bool direct = 8;
+  // ttl_seconds shortens how long the session (and its URL) lives; 0 means
+  // Viper's default, and Viper caps it.
+  int64 ttl_seconds = 9;
+  // content_type is optional, checked against the field's allowed types.
+  // The finished file's sniffed type is checked again on complete.
+  string content_type = 10;
+}
+
+message CreateUploadReply {
+  // upload is the session id.
+  string upload = 1;
+  // mode is "direct" or "parts".
+  string mode = 2;
+  // url is where a direct upload PUTs the whole file; "" in parts mode.
+  string url = 3;
+  // part_size and parts say how a parts upload is cut.
+  int64 part_size = 4;
+  int32 parts = 5;
+  // expires_unix is when the url (direct) or the session (parts) stops.
+  int64 expires_unix = 6;
+  // headers the visitor must send with the PUT to url (the signature pins
+  // Content-Length); empty in parts mode.
+  map<string, string> headers = 7;
+}
+
+message CompleteUploadRequest {
+  string call = 1;
+  string upload = 2;
+  // sha256 is optional; it must agree with the one sent at the start.
+  string sha256 = 3;
+}
+
+message CompleteUploadReply {
+  // record is the record with the file added, as JSON.
+  bytes record = 1;
+}

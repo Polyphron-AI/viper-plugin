@@ -1,0 +1,44 @@
+{
+  "name": "@polyphron/viper-plugin",
+  "version": "0.6.14",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Polyphron-AI/viper-plugin.git",
+    "directory": "typescript"
+  },
+  "description": "Build Viper plugins in TypeScript: serve the Plugin service and call the Host back, typed.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "bun": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.16.0",
+    "@grpc/grpc-js": "^1.14.6"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "ts-proto": "^2.15.0",
+    "typescript": "~6"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
