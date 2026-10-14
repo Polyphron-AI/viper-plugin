@@ -2,7 +2,7 @@
   "id": "chatalerts",
   "version": "1.0.0",
   "title": "Chat alerts",
-  "viper": ">=0.6.14 <0.7.0",
+  "viper": ">=0.6.14 <1.0.0",
   "binaries": {
     "linux/amd64": { "path": "bin/chat-alerts-linux-amd64" },
     "windows/amd64": { "path": "bin/chat-alerts.exe" }

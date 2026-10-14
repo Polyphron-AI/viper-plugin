@@ -8,8 +8,10 @@ import (
 	"strings"
 )
 
-// AnyViper is the range a manifest without one gets: any 0.6 release.
-const AnyViper = ">=0.6.0 <0.7.0"
+// AnyViper is the range a manifest without one gets: any 0.x release from
+// 0.6 on. The plugin contract has not changed since 0.6, so a plugin that
+// names no range runs until 1.0.
+const AnyViper = ">=0.6.0 <1.0.0"
 
 // rangePart is one comparison in a range, like ">=0.6.8".
 var rangePart = regexp.MustCompile(`^(>=|<=|>|<|=)?(\d+\.\d+\.\d+)$`)
@@ -78,14 +80,14 @@ func (c comparison) holds(v [3]int) bool {
 }
 
 // parseRange reads a range: comparisons split by spaces, all of which must
-// hold, like ">=0.6.8 <0.7.0".
+// hold, like ">=0.6.8 <1.0.0".
 func parseRange(text string) ([]comparison, error) {
 	var out []comparison
 
 	for _, f := range strings.Fields(text) {
 		m := rangePart.FindStringSubmatch(f)
 		if m == nil {
-			return nil, fmt.Errorf("the viper range %q must be comparisons like \">=0.6.8 <0.7.0\"", text)
+			return nil, fmt.Errorf("the viper range %q must be comparisons like \">=0.6.8 <1.0.0\"", text)
 		}
 
 		v, _ := release(m[2])

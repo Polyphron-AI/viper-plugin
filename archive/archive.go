@@ -65,7 +65,7 @@ type Manifest struct {
 	Binaries map[string]Binary `json:"binaries"`
 
 	// Viper is the range of Viper versions the plugin runs on, like
-	// ">=0.6.8 <0.7.0". Empty means any 0.6 release (AnyViper).
+	// ">=0.6.8 <1.0.0". Empty means any 0.x release from 0.6 on (AnyViper).
 	Viper string `json:"viper,omitempty"`
 
 	// Elevated lists the app routes that run as the service, and what each

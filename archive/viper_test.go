@@ -9,7 +9,8 @@ func TestRuns(t *testing.T) {
 		runs, ok     bool
 	}{
 		{"", "v0.6.8", true, true},
-		{"", "v0.7.0", false, true},
+		{"", "v0.8.0", true, true},
+		{"", "v1.0.0", false, true},
 		{">=0.6.8 <0.7.0", "v0.6.7", false, true},
 		{">=0.6.8 <0.7.0", "v0.6.8", true, true},
 		{">=0.6.8 <0.7.0", "v0.6.9-3-gabc123", true, true},

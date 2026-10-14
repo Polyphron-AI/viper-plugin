@@ -113,7 +113,7 @@ bun build index.ts --compile --target=bun-windows-x64 --outfile bin/hello.exe
 Next to the binaries, write `manifest.json`. The `id` and `version` must
 match the plugin's description. `viper` is the range of Viper versions it
 runs on; a server outside it refuses the install, and leaving it out means
-any 0.6 release. `sign --viper` sets it too. Platforms are named `os/arch`,
+any 0.x release from 0.6 on. `sign --viper` sets it too. Platforms are named `os/arch`,
 the Go way:
 
 ```json
@@ -121,7 +121,7 @@ the Go way:
   "id": "hello",
   "version": "1.0.0",
   "title": "Hello",
-  "viper": ">=0.6.8 <0.7.0",
+  "viper": ">=0.6.8 <1.0.0",
   "binaries": {
     "linux/amd64": { "path": "bin/hello-linux-amd64" },
     "windows/amd64": { "path": "bin/hello.exe" }

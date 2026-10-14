@@ -90,7 +90,7 @@ binaries in WSL or on that OS instead.
   "id": "hellots",
   "version": "1.0.0",
   "title": "Hello TS",
-  "viper": ">=0.6.8 <0.7.0",
+  "viper": ">=0.6.8 <1.0.0",
   "binaries": {
     "windows/amd64": { "path": "bin/hellots.exe" },
     "linux/amd64": { "path": "bin/hellots-linux-amd64" },
@@ -103,8 +103,8 @@ binaries in WSL or on that OS instead.
 The `id` and `version` must match the plugin's description. Leave out
 `sha256`; signing fills it in. `viper` is the range of Viper versions the
 plugin runs on, comparisons split by spaces (`>=`, `<=`, `>`, `<`, `=`). A
-server outside it refuses the install; leaving it out means any 0.6 release.
-`sign --viper ">=0.6.8 <0.7.0"` sets it without editing the file.
+server outside it refuses the install; leaving it out means any 0.x release from 0.6 on.
+`sign --viper ">=0.6.8 <1.0.0"` sets it without editing the file.
 
 ### Sign
 

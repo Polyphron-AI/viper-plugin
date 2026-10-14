@@ -1,6 +1,6 @@
 {
   "name": "@polyphron/viper-plugin",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Polyphron-AI/viper-plugin.git",

@@ -82,7 +82,7 @@ func sign(name string, args []string, usage error) error {
 	viper := fs.String(
 		"viper",
 		"",
-		"the Viper versions it runs on, like \">=0.6.8 <0.7.0\" (default: the manifest's, else any 0.6)",
+		"the Viper versions it runs on, like \">=0.6.8 <1.0.0\" (default: the manifest's, else any 0.x from 0.6)",
 	)
 	_ = fs.Parse(args)
 
