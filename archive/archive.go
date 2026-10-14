@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -145,6 +146,10 @@ func SignFor(dir, privateKey, viper string, w io.Writer) (Manifest, error) {
 		m.Viper = viper
 	}
 
+	if err := m.Check(); err != nil {
+		return m, err
+	}
+
 	for platform, b := range m.Binaries {
 		data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(b.Path)))
 		if err != nil {
@@ -154,10 +159,6 @@ func SignFor(dir, privateKey, viper string, w io.Writer) (Manifest, error) {
 		sum := sha256.Sum256(data)
 		b.SHA256 = hex.EncodeToString(sum[:])
 		m.Binaries[platform] = b
-	}
-
-	if err := m.Check(); err != nil {
-		return m, err
 	}
 
 	signed, err := json.MarshalIndent(m, "", "  ")
@@ -235,7 +236,7 @@ func (m Manifest) Check() error {
 	for platform, b := range m.Binaries {
 		clean := path.Clean(b.Path)
 
-		if clean != b.Path || path.IsAbs(clean) || strings.HasPrefix(clean, "..") || clean == ManifestName || clean == SignatureName {
+		if !fs.ValidPath(b.Path) || b.Path == "." || strings.ContainsAny(b.Path, "\\:\x00") || clean != b.Path || path.IsAbs(clean) || strings.HasPrefix(clean, "..") || clean == ManifestName || clean == SignatureName {
 			return fmt.Errorf("the binary path %q for %s must be a plain path inside the archive", b.Path, platform)
 		}
 	}

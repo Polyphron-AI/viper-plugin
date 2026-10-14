@@ -63,8 +63,8 @@ func main() {
 Build one binary per platform you support:
 
 ```sh
-GOOS=linux GOARCH=amd64 go build -o bin/hello-linux-amd64 .
-GOOS=windows GOARCH=amd64 go build -o bin/hello.exe .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/hello-linux-amd64 .
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o bin/hello.exe .
 ```
 
 ## A TypeScript plugin
